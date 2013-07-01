@@ -1,0 +1,58 @@
+Suggested xHCI trace points:
+
+I want specific xHCI debugging statements grouped into the same trace event
+class.  That way I can, for example, turn on all debugging associated with
+addressing a USB device.
+
+Poking around, it looks like you can print dynamically sized messages with trace events.
+See drivers/net/wireless/ath/ath6kl/trace.c and debug.c
+Not sure what the correct format is to do this though.
+
+
+'init':
+ - xHCI initialization debugging
+ - passed a string, which gets printed
+ - e.g.
+	xhci_hcd 0000:00:14.0: setting latency timer to 64
+	xhci_hcd 0000:00:14.0: xHCI Host Controller
+	xhci_hcd 0000:00:14.0: new USB bus registered, assigned bus number 3
+
+'allocation':
+ - debugging strings associated with allocation of rings, segments, device contexts, scratchpad pages, etc.
+ - e.g. printing about moving rings to the cache, or expanding rings
+
+'device_context'
+ - tracepoint to print the whole device context, up to a specific endpoint context.
+ - similar to xhci_dbg_ctx
+
+'cmd_status':
+ - good to get a high-level view of what commands are being issued
+ - however, we need tracepoints for each type of command, so we can get the details
+
+'address':
+ - all debugging associated with addressing a USB device
+ - all debug statements in xhci_address_device
+ - all debug statements in xhci_alloc_dev
+ - setting up the device input context in xhci_alloc_virt_device()
+
+Ideally, a different trace event for the output of the various common xHCI commands:
+ - 'configure_endpoint'
+ - 'evaluate_context'
+ - 'reset_endpoint'
+ - 'reset_device'
+ - 'change_maxpacket'
+ - probably others
+
+'doorbell'
+ - xhci_ring_cmd_db
+
+'cmd_abort'
+ - all print statements in xhci_abort_cmd_ring
+ - xhci_cancel_cmd
+
+'bandwidth'
+ - xhci_check_bw_table and functions it calls
+ - xhci_check_bandwidth
+ - xhci_reset_bandwidth
+ - xhci_drop_endpoint
+ - xhci_add_endpoint
