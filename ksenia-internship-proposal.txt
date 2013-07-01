@@ -38,8 +38,15 @@ of xHCI events that would be useful to break out.  For example, breaking
 out events for different xHCI commands would be good, as well as
 breaking out a trace event for xHCI transfer errors.
 
-Each trace event will take some time to complete, and ramping up on the
-dynamic debugging options (and the xHCI driver code) will take some
-time.  The internship will be considered a success if the infrastructure
-for xHCI trace events is laid out, and at least one trace event is
-added.
+Documentation
+-------------
+
+Dynamic debugging documentation: Documentation/dynamic-debug-howto.txt
+
+LWN articles on trace events:
+http://lwn.net/Articles/387172/
+http://lwn.net/Articles/379903/
+http://lwn.net/Articles/381064/
+
+Example of adding a tracepoint:
+https://patchwork-mail.kernel.org/patch/2633001/
