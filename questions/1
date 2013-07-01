@@ -1,0 +1,25 @@
+Hi Sarah,
+
+In xhci.h, the macro used for setting the stream context type:
+
+#define    SCT_FOR_CTX(p)        (((p) << 1) & 0x7)
+
+maybe it does not do what you want. Because if you want to
+set the stream context type to  SCT_SSA_256 (=7) and you
+use the above macro you will take 0110 (in binary).
+
+I don't know, is that what you want or 1110 ?
+
+This macro is used only in this part in the driver:
+
+addr = cur_ring->first_seg->dma |
+            SCT_FOR_CTX(SCT_PRI_TR) |
+            cur_ring->cycle_state;
+stream_info->stream_ctx_array[cur_stream].stream_ring =
+            cpu_to_le64(addr);
+
+in xhci_alloc_stream_info()
+
+So it won't trigger a problem, but if in the future
+support for Secondary Stream Arrays is added then there
+will be problem if SCT is not set properly.
