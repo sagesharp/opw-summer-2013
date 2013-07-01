@@ -1,0 +1,45 @@
+xHCI OPW internship proposal
+----------------------------
+
+Currently, to enable xHCI debugging, the user must recompile their
+kernel with CONFIG_USB_XHCI_HCD_DEBUGGING turned on.  This is
+inconvenient when working with bug reporters, since it is a pain for
+them to recompile their kernel, especially if it is a Linux distro
+kernel.
+
+The configuration option was originally put in because that's what other
+kernel drivers did.  Since 2009 when the driver went in, the kernel
+infrastructure has changed to include several options for dynamic
+debugging that do not require recompiling your kernel.
+
+The first is CONFIG_DYNAMIC_DEBUG.  Allows the user to dynamically
+choose which printk or dev_dbg statements are enabled at runtime.  By
+default, all statements should be turned off.  The user can dynamically
+enable debugging for a particular driver file, or even per line in a
+driver file.
+
+This should currently work with the xHCI driver, but it does not.  When
+CONFIG_DYNAMIC_DEBUG and CONFIG_USB_XHCI_HCD_DEBUGGING are turned on,
+the driver prints debugging to dmesg by default.  It should not do so
+until the user enables it.  One hypothesis is that the xhci_dbg macro is
+confusing the dynamic debug system, and we just need to change xhci_dbg
+(and friends) to dev_dbg.  Then we can have dynamic debugging.
+
+One step further would be to add trace events to the xHCI driver.  Trace
+events are a light weight way of adding dynamic debugging to the driver
+with minimum performance impact.  Minimizing performance impact is
+vital, since much of the xHCI code executes in interrupt context.
+
+Trace events also allow the user to enable only specific trace events.
+Often during xHCI debugging, we're only interested in specific events,
+and wading through the entire xHCI debugging output is tedious.  The
+first pass would be to work with Sarah Sharp to identify different types
+of xHCI events that would be useful to break out.  For example, breaking
+out events for different xHCI commands would be good, as well as
+breaking out a trace event for xHCI transfer errors.
+
+Each trace event will take some time to complete, and ramping up on the
+dynamic debugging options (and the xHCI driver code) will take some
+time.  The internship will be considered a success if the infrastructure
+for xHCI trace events is laid out, and at least one trace event is
+added.
