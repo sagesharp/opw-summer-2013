@@ -1,0 +1,35 @@
+ARs:
+
+Sarah:
+ - is it ok to set DMA mask after xhci_gen_setup?
+   - what about bounce buffer initialization?
+ - send feedback on cmd_status patch
+ - answer other questions
+
+Xenia:
+ - blog post by end of week
+ - create a patchset that:
+   1. Moves all instances of xhci_info to xhci_dbg, and removes xhci_info
+   2. Moves all instances of printk to xhci_dbg
+   3. Removes CONFIG_USB_XHCI_HCD_DEBUGGING and moves everything to dynamic debugging.
+ - try making a simple change to the OPW notes git repo,
+   and push to make sure you have the right permissions.
+ - put questions in the git repo
+ - revise cmd_status patch a bit - Sarah to send feedback.
+
+
+Trace events:
+
+End goal: have a way to turn on and off debug statements associated with one
+type of xHCI command.
+
+Start with a patch that enables a trace event for all debug statements
+associated with addressing a USB device.  Start with the debug statements in
+xhci_address_device() and xhci_setup_addressable_virt_dev().  I would suggest
+you leave the xhci_warn statements alone.  I would like to see those warnings,
+even when the trace event is off.
+
+For other trace events, like configure endpoint, you will also find debugging
+statements in the ring handling code, such as those in handle_cmd_completion().
+I don't think there are any debug statement for address device commands in the
+ring code, this is just for future reference.
