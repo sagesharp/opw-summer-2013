@@ -1,0 +1,24 @@
+Hi Sarah,
+
+In xhci_free_stream_info() defined in xhci-mem.c happens
+the following:
+
+-----------------------------------------------------
+
+if (!stream_info)
+        return;
+
+[snip]
+
+if (stream_info)
+        kfree(stream_info->stream_rings);
+
+-----------------------------------------------------
+
+Here, I suspect that the code wanted to check
+if stream_info->stream_rings is not NULL
+instead of stream_info (which is already
+checked).
+
+However, the check is not necessary anyway
+because kfree() checks for that internally.
