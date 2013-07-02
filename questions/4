@@ -1,0 +1,23 @@
+Hi Sarah,
+
+In function xhci_calculate_lpm_timeout() in xhci.c, i see
+that the code loops through the entire config->interface[] array.
+
+for (i = 0; i < USB_MAXINTERFACES; i++) {
+
+I think it would be more efficient to loop through the
+number of interfaces that are actually supported by
+the given configuration. I mean to do:
+
+for (i = 0; i < config->desc.bNumInterfaces; i++) {
+
+because it is "guaranteed" that interfaces will be stored
+sequentially into this array.
+
+And i say "guaranteed" because this is the way used
+across the usb/core/usb.c to traverse the interface
+array of a given configuration.
+
+That will save you unnecessary loop cycles since most
+configurations come with 1-2 interfaces and the
+USB_MAXINTERFACES is 32.
