@@ -1,0 +1,17 @@
+Hi Sarah,
+
+In function xhci_alloc_stream_ctx() defined in xhci-mem.c i cannot
+understand the following:
+
+pdev=to_pci_dev(dev) function is called in order to take a pointer to the
+pci_dev struct that contains the generic struct device dev.
+
+And then the code does pdev->dev to take again the generic dev
+field of pci_dev struct.
+
+Why it does not use directly dev instead of going back to it through
+pci_dev?
+
+Also, will this code work for non-pci platforms because it is pci specific?
+
+I saw this kind of use of pci_dev struct and in other parts in xhci-mem.c
