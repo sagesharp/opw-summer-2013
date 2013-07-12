@@ -1,0 +1,30 @@
+Hi Sarah,
+
+When running checkpatch script on xhci.c it is produced the
+following warning:
+
+WARNING: msleep < 20ms can sleep for up to 20ms;
+see Documentation/timers/timers-howto.txt
++	msleep(10);
+
+The implementation of msleep() is based on jiffies timeout
+subsystem. Hence, its resolution is constrained by the value
+of HZ tick rate. When HZ variable is configured to 100 (the
+most common), the jiffies variable is updated every 10 ms.
+
+void msleep(unsigned int msecs)
+{
+         unsigned long timeout = msecs_to_jiffies(msecs) + 1;
+
+         while (timeout)
+                 timeout = schedule_timeout_uninterruptible(timeout);
+}
+
+The timeout for msecs = 10 will be two, so the msleep will sleep for
+up to 20ms (if it was called write after the jiffies variable was updated)
+
+Because timeout = ((m + (MSEC_PER_SEC / HZ) - 1) / (MSEC_PER_SEC / HZ)) + 1 =
+                = ((m + 10 - 1) / 10) + 1 = 2
+
+If you want precision maybe it is better here to use hrtimers via
+usleep_range() that provide microsecond-level resolution.
