@@ -1,0 +1,12 @@
+blog post: trace-cmd plugin
+ - more userspace plugins?
+
+Sarah to read about trace-cmd
+
+move onto doing trace events for configure endpoint command and evaluate context commands
+
+trace completed command in handle_cmd - so that trace-cmd can handle it.
+
+make a branch for Xenia to build her patches on - forward link to that branch
+
+put a list of things to do next in the git repo.
