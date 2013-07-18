@@ -1,0 +1,170 @@
+From f4ebe16b7913931ca676fc524721cf9010baf3d3 Mon Sep 17 00:00:00 2001
+From: Xenia Ragiadakou <burzalodowa@gmail.com>
+Date: Thu, 18 Jul 2013 23:59:11 +0300
+Subject: [PATCH] xhci: add xhci_ctx and xhci_cmd trace events
+
+This patch adds xhci_ctx tracepoints in xhci_address_device() in
+places where there is a call to xhci_dbg_ctx().
+This tracepoint will print the entire context (control, slot and
+endpoint contexts) when the xhci plugin is loaded.
+
+Also, this patch adds an xhci_cmd tracepoint in handle_cmd_completion()
+which will print the command completion event fields as well as the
+associated command's TRB fields, if the xhci plugin is loaded.
+
+Signed-off-by: Xenia Ragiadakou <burzalodowa@gmail.com>
+---
+ drivers/usb/host/xhci-ring.c  |  3 ++
+ drivers/usb/host/xhci-trace.h | 68 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/xhci.c       |  5 ++++
+ 3 files changed, 76 insertions(+)
+
+diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
+index 1e57eaf..a0c08ad 100644
+--- a/drivers/usb/host/xhci-ring.c
++++ b/drivers/usb/host/xhci-ring.c
+@@ -67,6 +67,7 @@
+ #include <linux/scatterlist.h>
+ #include <linux/slab.h>
+ #include "xhci.h"
++#include "xhci-trace.h"
+ 
+ static int handle_cmd_in_cmd_wait_list(struct xhci_hcd *xhci,
+ 		struct xhci_virt_device *virt_dev,
+@@ -1377,6 +1378,8 @@ static void handle_cmd_completion(struct xhci_hcd *xhci,
+ 		return;
+ 	}
+ 
++	trace_xhci_cmd(&xhci->cmd_ring->dequeue->generic, event);
++
+ 	if ((GET_COMP_CODE(le32_to_cpu(event->status)) == COMP_CMD_ABORT) ||
+ 		(GET_COMP_CODE(le32_to_cpu(event->status)) == COMP_CMD_STOP)) {
+ 		/* If the return value is 0, we think the trb pointed by
+diff --git a/drivers/usb/host/xhci-trace.h b/drivers/usb/host/xhci-trace.h
+index 432aa67..8d92193 100644
+--- a/drivers/usb/host/xhci-trace.h
++++ b/drivers/usb/host/xhci-trace.h
+@@ -18,6 +18,7 @@
+ #define __XHCI_TRACE_H
+ 
+ #include <linux/tracepoint.h>
++#include "xhci.h"
+ 
+ #define XHCI_MSG_MAX	500
+ 
+@@ -36,6 +37,73 @@ DEFINE_EVENT(xhci_log_msg, xhci_dbg_address,
+ 	TP_ARGS(vaf)
+ );
+ 
++DECLARE_EVENT_CLASS(xhci_log_ctx,
++	TP_PROTO(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx,
++		 unsigned int last_ep),
++	TP_ARGS(xhci, ctx, last_ep),
++	TP_STRUCT__entry(
++		__field(int, ctx_64)
++		__field(unsigned, ctx_type)
++		__field(dma_addr_t, ctx_dma)
++		__field(u8 *, ctx_va)
++		__field(unsigned, ctx_last_ep)
++		__field(int, slot_id)
++		__dynamic_array(u8, ctx_data, ctx->size)
++	),
++	TP_fast_assign(
++		struct usb_device *udev;
++
++		udev = to_usb_device(xhci_to_hcd(xhci)->self.controller);
++		__entry->ctx_64 = HCC_64BYTE_CONTEXT(xhci->hcc_params);
++		__entry->ctx_type = ctx->type;
++		__entry->ctx_dma = ctx->dma;
++		__entry->ctx_va = ctx->bytes;
++		__entry->slot_id = udev->slot_id;
++		__entry->ctx_last_ep = last_ep;
++		memcpy(__get_dynamic_array(ctx_data), ctx->bytes, ctx->size);
++	),
++	TP_printk("\n64bytes_ctx = %d\nctx_type = %u\n"
++		  "ctx_dma = @%08llx\nctx_va = @%p",
++		  __entry->ctx_64, __entry->ctx_type, __entry->ctx_dma,
++		  __entry->ctx_va
++	)
++);
++
++DEFINE_EVENT(xhci_log_ctx, xhci_ctx,
++	TP_PROTO(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx,
++		 unsigned int last_ep),
++	TP_ARGS(xhci, ctx, last_ep)
++);
++
++DECLARE_EVENT_CLASS(xhci_log_cmd,
++	TP_PROTO(void *cmd_trb_va, struct xhci_event_cmd *compl_event),
++	TP_ARGS(cmd_trb_va, compl_event),
++	TP_STRUCT__entry(
++		__field(void *, va)
++		__field(u64, dma)
++		__field(u32, status)
++		__field(u32, flags)
++		__dynamic_array(__le32, cmd_trb, 4)
++	),
++	TP_fast_assign(
++		__entry->va = cmd_trb_va;
++		__entry->dma = le64_to_cpu(compl_event->cmd_trb);
++		__entry->status = le32_to_cpu(compl_event->status);
++		__entry->flags = le32_to_cpu(compl_event->flags);
++		memcpy(__get_dynamic_array(cmd_trb), cmd_trb_va,
++		       sizeof(struct xhci_generic_trb));
++	),
++	TP_printk("\ncmd_trb_dma = @%08llx\ncmd_trb_va = @%p\n"
++		  "cmd_status = %08x\ncmd_flags = %08x",
++		  __entry->dma, __entry->va, __entry->status, __entry->flags
++	)
++);
++
++DEFINE_EVENT(xhci_log_cmd, xhci_cmd,
++	TP_PROTO(void *cmd_trb_va, struct xhci_event_cmd *compl_event),
++	TP_ARGS(cmd_trb_va, compl_event)
++);
++
+ #endif /* __XHCI_TRACE_H */
+ 
+ /* this part must be outside header guard */
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+index 620b812..cb83111 100644
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -29,6 +29,7 @@
+ #include <linux/dmi.h>
+ 
+ #include "xhci.h"
++#include "xhci-trace.h"
+ 
+ #define DRIVER_AUTHOR "Sarah Sharp"
+ #define DRIVER_DESC "'eXtensible' Host Controller (xHC) Driver"
+@@ -3705,6 +3706,7 @@ int xhci_address_device(struct usb_hcd *hcd, struct usb_device *udev)
+ 
+ 	xhci_dbg_address(xhci, "Slot ID %d Input Context:\n", udev->slot_id);
+ 	xhci_dbg_ctx(xhci, virt_dev->in_ctx, 2);
++	trace_xhci_ctx(xhci, virt_dev->in_ctx, 2);
+ 
+ 	spin_lock_irqsave(&xhci->lock, flags);
+ 	cmd_trb = xhci->cmd_ring->dequeue;
+@@ -3761,6 +3763,7 @@ int xhci_address_device(struct usb_hcd *hcd, struct usb_device *udev)
+ 		xhci_dbg_address(xhci, "Slot ID %d Output Context:\n",
+ 					udev->slot_id);
+ 		xhci_dbg_ctx(xhci, virt_dev->out_ctx, 2);
++		trace_xhci_ctx(xhci, virt_dev->out_ctx, 2);
+ 		ret = -EINVAL;
+ 		break;
+ 	}
+@@ -3776,8 +3779,10 @@ int xhci_address_device(struct usb_hcd *hcd, struct usb_device *udev)
+ 				(unsigned long long)virt_dev->out_ctx->dma);
+ 	xhci_dbg_address(xhci, "Slot ID %d Input Context:\n", udev->slot_id);
+ 	xhci_dbg_ctx(xhci, virt_dev->in_ctx, 2);
++	trace_xhci_ctx(xhci, virt_dev->in_ctx, 2);
+ 	xhci_dbg_address(xhci, "Slot ID %d Output Context:\n", udev->slot_id);
+ 	xhci_dbg_ctx(xhci, virt_dev->out_ctx, 2);
++	trace_xhci_ctx(xhci, virt_dev->out_ctx, 2);
+ 	/*
+ 	 * USB core uses address 1 for the roothubs, so we add one to the
+ 	 * address given back to us by the HC.
+-- 
+1.8.3.2
+

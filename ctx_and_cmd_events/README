@@ -1,0 +1,50 @@
+First, download the trace-cmd tool and install it:
+
+$ git clone git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/trace-cmd.git
+$ make && sudo make install
+
+This will install it by default in /usr/local/bin.
+If you want to install it in another directory do:
+
+$ make prefix=<dir> install
+
+Place the plugin called plugin_xhci.py in the plugins directory.
+The plugins directory will be by default in /usr/local/lib/trace-cmd/plugins,
+otherwise if you have set another directory in <dir>/lib/trace-cmd/plugins.
+
+Then, apply the patch, compile and reboot.
+
+To enable the xhci_cmd traces, from any directory do:
+
+$ trace-cmd record -e xhci-hcd:xhci_cmd
+
+That command will create a trace.dat file, in your current directory,
+where the trace output is written.
+Plug-unplug a USB device and type Ctrl-C to disable the trace event.
+Then, do:
+
+$ trace-cmd report
+
+This command will load the xhci_plugin.py and if there is a handler
+implemented for the recorded trace event, this handler will be used
+to parse the trace output recorded in trace.dat and will display in
+the console the formatted trace output.
+
+Now, in case that there is no handler implemented, then the output
+will be displayed by the default ftrace printk (defined in the
+corresponding DECLARE_EVENT_CLASS TP_printk macro). You can remove
+the plugin to see the default trace output (which is not informative
+at all by the way).
+
+With an analogous way, you can proceed for testing the xhci_ctx event.
+
+If you want to enable both of them do:
+
+$ trace-cmd record -e xhci-hcd:xhci_c*
+
+And if you want to enable all xhci events do:
+
+$ trace-cmd record -e xhci-hcd
+
+After finishing with testing, get rid of the trace.dat ;)
+
