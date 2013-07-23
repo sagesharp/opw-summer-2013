@@ -21,7 +21,7 @@ $ trace-cmd record -e xhci-hcd:xhci_cmd
 That command will create a trace.dat file, in your current directory,
 where the trace output is written.
 Plug-unplug a USB device and type Ctrl-C to disable the trace event.
-Then, do:
+Then to view the generated traces, do:
 
 $ trace-cmd report
 
@@ -32,15 +32,21 @@ the console the formatted trace output.
 
 Now, in case that there is no handler implemented, then the output
 will be displayed by the default ftrace printk (defined in the
-corresponding DECLARE_EVENT_CLASS TP_printk macro). You can remove
-the plugin to see the default trace output (which is not informative
-at all by the way).
+corresponding DECLARE_EVENT_CLASS TP_printk macro).
+To see the default format do:
 
-With an analogous way, you can proceed for testing the xhci_ctx event.
+$ trace-cmd report -N
 
-If you want to enable both of them do:
+Also, the ring byffer entry fields can be printed in the raw format:
 
-$ trace-cmd record -e xhci-hcd:xhci_c*
+$ trace-cmd report -R
+
+With an analogous way, you can proceed for testing the xhci_address_ctx event,
+which prints the context when the address device command is issued.
+
+If you want to see both the address debug messages and the address context do:
+
+$ trace-cmd record -e xhci-hcd:*address*
 
 And if you want to enable all xhci events do:
 

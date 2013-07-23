@@ -1,10 +1,33 @@
 import tracecmd
 from struct import unpack
 
+def parse_ctx_field(name, d):
+    fields = {
+        "dev_info": "[Route=0x%x][Speed=%d][MTT=%d][Hub=%d][CtxEntries=%d]" %
+        (d & 0xfffff, (d>>20) & 0xf, (d>>25) & 0x1, (d>>26) & 0x1, d >> 27),
+        "dev_info2": "[MaxExitLat=%d][RHPort=%d][PortsNum=%d]" %
+        (d & 0xffff, (d>>16) & 0xff, (d>>24) & 0xff),
+        "tt_info": "[TTHubSlot=%d][TTPort=%d][TTT=%d][IntrTarget=%d]" %
+        (d & 0xff, (d>>8) & 0xff, (d>>16) & 0x3, d >> 22),
+        "dev_state": "[DevAddr=%x][SlotState=%d]" % (d & 0xff, d >> 27),
+        "ep_info": "[State=%d][Mult=%d][MaxPStreams=%d][LSA=%d][Interval=%d]" %
+        (d & 0x7, (d>>8) & 0x3, (d>>10) & 0x1f, (d>>15) & 0x1, (d>>16) & 0xff),
+        "ep_info2": "[CErr=%d][Type=%d][HID=%d][MaxBurstSz=%d][MaxPackSz=%d]" %
+        ((d>>1) & 0x3, (d>>3) & 0x7, (d>>7) & 0x1, (d>>8) & 0xff, d >> 16),
+        "deq": "[DCS=%d][TRDeqPtr=0x%x]" % (d & 0x1, (d>>4) << 4),
+        "tx_info": "[AvTRBLen=%d][MaxESITPayload=%d]" % (d & 0xffff, d >> 16)
+        }
+
+    if name in fields:
+        return fields[name]
+    else:
+        return ""
 
 def add_ctx_entry(l, field, data):
     dma, va, i = l[-1][1:]
-    ctx_entry = "%-10s\t0x%08x\t@%08x\t@%08x\n" % (field, data[i], dma, va)
+    parsed_field = parse_ctx_field(field, data[i])
+    ctx_entry = ("%-10s\t0x%08x\t@%08x\t@%08x\t%s\n" %
+                 (field, data[i], dma, va, parsed_field))
     if field != "deq" and field.find("rsvd64") < 0:
         dma += 4
         va += 4
@@ -24,7 +47,7 @@ def xhci_ctx_handler(trace_seq, event):
     slot_id = int(event['slot_id'])
     ctx_dma = long(event['ctx_dma'])
     ctx_va = long(event['ctx_va'])
-    ctx_last_ep = int(event['ctx_last_ep'])
+    ctx_ep_num = int(event['ctx_ep_num'])
 
     ctx_is_64bytes = int(event['ctx_64'])
     ctx_type_is_device = int(event['ctx_type']) == 0x1
@@ -33,15 +56,15 @@ def xhci_ctx_handler(trace_seq, event):
     if ctx_type_is_device:
         direction = "Output";
         if ctx_is_64bytes:
-            ctx_data_fmt = "<8I4Q" + "2IQ4I4Q"*31
+            ctx_data_fmt = "<8I4Q" + "2IQ4I4Q"*ctx_ep_num
         else:
-            ctx_data_fmt = "<8I" + "2IQ4I"*31
+            ctx_data_fmt = "<8I" + "2IQ4I"*ctx_ep_num
     elif ctx_type_is_input:
         direction = "Input"
         if ctx_is_64bytes:
-            ctx_data_fmt = "<8I4Q8I4Q" + "2IQ4I4Q"*31
+            ctx_data_fmt = "<8I4Q8I4Q" + "2IQ4I4Q"*ctx_ep_num
         else:
-            ctx_data_fmt = "<8I8I" + "2IQ4I"*31
+            ctx_data_fmt = "<8I8I" + "2IQ4I"*ctx_ep_num
     else:
         trace_seq.puts("\nUnknown context type: %d\n" % int(event['ctx_type']))
         return
@@ -65,7 +88,7 @@ def xhci_ctx_handler(trace_seq, event):
     if ctx_is_64bytes:
             [add_ctx_entry(l, "rsvd64[%d]" % j, ctx_bytes) for j in range(4)]
 
-    for ep in range(ctx_last_ep):
+    for ep in range(ctx_ep_num):
         l[-1][0] += "\nEndpoint %d %s Context:\n\n%s" % (ep, direction, label)
         [add_ctx_entry(l, ep_fields[j], ctx_bytes) for j in range(7)]
         if ctx_is_64bytes:
@@ -134,22 +157,23 @@ def get_cmd_data(cmd):
                   10 : ["Disable Slot Command", "[SlotID=%d]" % (cmd[6])],
                   11 : ["Address Device Command",
                         "[InputCtxPtr=%x][BSR=%d][SlotID=%d]" %
-                        (cmd[0], cmd[4] & 0x2, cmd[6])],
+                        (cmd[0], (cmd[4]>>1) & 0x1, cmd[6])],
                   12 : ["Configure Endpoint Command",
                         "[InputCtxPtr=%x][DC=%d][SlotID=%d]" %
-                        (cmd[0], cmd[4] & 0x2, cmd[6])],
+                        (cmd[0], (cmd[4]>>1) & 0x1, cmd[6])],
                   13 : ["Evaluate Context Command",
                         "[InputCtxPtr=%x][SlotID=%d]" % (cmd[0], cmd[6])],
                   14 : ["Reset Endpoint Command",
                         "[TSP=%d][EndpointID=%d][SlotID=%d]" %
-                        (cmd[4] & 0x2, cmd[5], cmd[6])],
+                        ((cmd[4]>>1) & 0x1, cmd[5], cmd[6])],
                   15 : ["Stop Endpoint Command",
-                        "[EndpointID=%d][SP=%d][SlotID=%d]" %
-                        (cmd[5] & 0x7f, cmd[5] >> 7, cmd[6])],
+                        "[EpID=%d][SP=%d][SlotID=%d]" %
+                        (cmd[5] & 0x1f, cmd[5] >> 7, cmd[6])],
                   16 : ["Set TR Dequeue Pointer Command",
-                        "[SCT=%d][TRDeqPtr=%x][StreamID=%d][EpID=%d][SlotID=%d]"
-                        % ((cmd[0] & 0xf) >> 1, cmd[0] & ~0xf,
-                           cmd[2], cmd[5], cmd[6])],
+                        "[DCS=%d][SCT=%d][TRDeqPtr=%x][StreamID=%d]"\
+                            "[EpID=%d][SlotID=%d]" %
+                        (cmd[0] & 0x1, (cmd[0]>>1) & 0x7, (cmd[0]>>4) << 4,
+                         cmd[2], cmd[5], cmd[6])],
                   17 : ["Reset Device Command", "[SlotID=%d]" % (cmd[6])],
                   18 : ["Force Event Command",
                         "[EventTRBPtr=%x][VFIntrID=%d][VFID=%d]" %
@@ -157,12 +181,11 @@ def get_cmd_data(cmd):
                   19 : ["Negotiate Bandwidth Command",
                         "[SlotID=%d]" % (cmd[6])],
                   20 : ["Set Latency Tolerance Value Command",
-                        "[BELT=%d]" % (cmd[6] << 8 | cmd[5])],
+                        "[BELT=%d]" % ((cmd[6]<<8) | cmd[5])],
                   21 : ["Get Port Bandwidth Command",
                         "[PortBwCtxPtr=%x][DevSpeed=%d][HubSlotID=%d]" %
                         (cmd[0], cmd[5], cmd[6])],
-                  22 : ["Force Header Command",
-                        "[PacketType=%d][RootHubPort=%d]" %
+                  22 : ["Force Header Command", "[PacketType=%d][RHPort=%d]" %
                         (cmd[0] & 0x1f, cmd[6])],
                   23 : ["No Op Command", ""] }
 
@@ -200,6 +223,7 @@ def xhci_cmd_handler(trace_seq, event):
 
 
 def register(pevent):
-    pevent.register_event_handler('xhci-hcd', 'xhci_ctx', xhci_ctx_handler)
+    pevent.register_event_handler('xhci-hcd', 'xhci_address_ctx',
+                                  xhci_ctx_handler)
     pevent.register_event_handler('xhci-hcd', 'xhci_cmd', xhci_cmd_handler)
 
