@@ -1,0 +1,10 @@
+Add a new trace point for print statements relating to resetting an endpoint.
+
+An endpoint reset happens when a USB device answers with a STALL packet to a
+transfer.  This means the host should not talk to the device until it clears
+the STALL, by sending a USB control transfer.  The xHCI host also needs to know
+the endpoint has been reset, so the xHCI driver issues a command to it.
+
+Functions:
+ - xhci_endpoint_reset in xhci.c
+ - handle_reset_ep_completion in xhci-ring.c

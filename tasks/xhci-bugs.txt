@@ -1,0 +1,27 @@
+When a USB non-control endpoint stalls, and the xHC endpoint ring will transfer
+to the 'halted' state. The xHCI driver must clear the stall by issuing a Reset
+Endpoint command. This resets the USB 2.0 endpoint toggles to zero, and sends a
+Clear Halt control transfer to the device. The xHC will fail the Reset Endpoint
+command if the endpoint ring is not halted.
+
+Some USB devices use the reset endpoint as a 'soft reset', and may need the
+Clear Halt control transfer and data toggles reset even if the endpoint has not
+recently stalled. When the xHCI driver's xhci_endpoint_reset() function is
+called, it will refuse to issue the Reset Endpoint command if the endpoint is
+not halted from a recent stall.
+
+Instead, what the driver needs to do is issue a Configure Endpoint command for
+the endpoint. You may need to zero the endpoint ring, reset the cycle bit, and
+reset the dequeue/enqueue pointers to the first TRB on the first ring segment.
+That code should be similar to the code in xhci_reinit_cached_ring().  You
+might be able to just call that function, and then set the endpoint type again.
+
+You may also be able to test by unbinding a USB device driver and using the
+usbfs USBDEVFS_RESETEP IOCTL (see drivers/usb/core/devio.c and
+Documentation/usb/proc_usb_info.txt).  Otherwise, send the patch out as an RFC,
+and I will get my QA tester to try it out.
+
+See these threads for more explanation:
+
+http://marc.info/?l=linux-usb&m=134852269014614&w=2
+http://marc.info/?l=linux-usb&m=134922286125585&w=2
