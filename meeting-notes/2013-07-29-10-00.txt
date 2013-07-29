@@ -1,0 +1,24 @@
+TODO
+-----
+
+Sarah
+ - give Xenia both more tracepoints and xhci bugs.  More, more! :)
+ - email Andy - try to understand his feedback on the DMA patch.
+
+Xenia
+ - debug the failure to print the context:
+   - try to increase event ring buffer from debugfs - change size?
+   - email Steve Rostedt and Cc linux-trace-users@vger.kernel.org, ask if this is expected behavior.
+
+Notes
+-----
+
+when the trace context plugin is not loaded, sometimes the contexts are not
+printed in dmesg.
+ - sometimes prints, but only small contexts are printed.
+ - for command - context is big
+ - try to increase ring buffer from debugfs - change size?
+   - email Steve Rostedt and cc linux-trace-users mailing list
+
+Linux Con Europe:
+ - Xenia will fly in on Oct 20th - morning - leave on 25th
