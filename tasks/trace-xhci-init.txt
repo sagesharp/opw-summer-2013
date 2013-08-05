@@ -1,0 +1,27 @@
+There's a whole bunch of messages related to xHCI initialization and
+driver unload.  Those messages should be in their own trace event.
+
+This includes:
+
+xhci.c:
+
+xhci_halt
+xhci_start
+xhci_reset
+xhci_setup_msi
+xhci_setup_msix
+xhci_try_enable_msi
+xhci_init
+xhci_run
+xhci_stop
+xhci_shutdown
+xhci_set_cmd_ring_deq
+
+xhci-mem.c:
+
+xhci_mem_init
+xhci_setup_port_arrays
+xhci_add_in_port
+xhci_set_hc_event_deq
+xhci_mem_cleanup
+scratchpad_alloc
