@@ -1,0 +1,31 @@
+This should be easy to test by using a USB 2.0 webcam under the xHCI
+host, or by issuing very large contiguous transfers to a mass storage
+device (e.g. use dd with a very large block size and transfer size).
+
+prepare_ring checks if there is enough room on the endpoint ring to
+queue N TRBs.  If not, there is an if statement block where it tries to
+expand the ring to include more segments:
+
+        while (1) {
+                if (room_on_ring(xhci, ep_ring, num_trbs))
+                        break;
+
+                if (ep_ring == xhci->cmd_ring) {
+                        xhci_err(xhci, "Do not support expand command ring\n");
+                        return -ENOMEM;
+                }
+
+                xhci_dbg(xhci, "ERROR no room on ep ring, "
+                                        "try ring expansion\n");
+                num_trbs_needed = num_trbs - ep_ring->num_trbs_free;
+                if (xhci_ring_expansion(xhci, ep_ring, num_trbs_needed,
+                                        mem_flags)) {
+                        xhci_err(xhci, "Ring expansion failed\n");
+                        return -ENOMEM;
+                }
+        }
+
+Add all the debugging statements from that block to a new trace point.
+Also add all statements from xhci_ring_expansion to the trace point.
+Should be only two statements, but studying the code will give you some
+insight into how the ring expansion works. :)
