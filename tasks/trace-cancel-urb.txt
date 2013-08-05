@@ -1,0 +1,14 @@
+Trace the cancellation of URBs:
+
+xhci-ring.c:
+-----------
+xhci_find_new_dequeue_state
+td_to_noop
+xhci_queue_new_dequeue_state
+handle_stopped_endpoint
+xhci_stop_endpoint_command_watchdog
+handle_set_deq_completion
+
+xhci.c
+------
+xhci_urb_dequeue
