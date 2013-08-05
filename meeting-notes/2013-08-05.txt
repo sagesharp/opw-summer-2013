@@ -1,0 +1,27 @@
+TODO
+-----
+
+Xenia
+ - send updated DMA patch to Sarah only
+ - new trace event patches should be based on the last six sent to Sarah
+   - i.e. should be based on [RFC v2 4/4] xhci: add xhci_cmd_completion trace event
+
+Sarah
+ - review DMA patch, see if it's what Andy wanted.
+ - get trace events into usb-next
+
+Notes
+-----
+
+transfer events - added a trace event
+trace log command - make more generic?
+ - new patches should be based on last six patches
+
+endpoint is not halted - refusing to reset.
+ - mass storage driver only clears the halt when the endpoint is actually halted.
+ - this is from the USB core, not from mass storage
+ - USB core issues a clear halt on configuration or alternate interface setting changes
+
+DMA mask patch
+ - may have more feedback from Andy
+ - Sarah to staighten this out - Xenia to send patch to me, then we see what needs to be done
