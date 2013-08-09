@@ -1,0 +1,37 @@
+On Fri, Aug 09, 2013 at 05:14:48PM -0400, Alan Stern wrote:
+> On Fri, 9 Aug 2013, Greg KH wrote:
+> 
+> > On Thu, Aug 08, 2013 at 10:07:19PM +0200, Martin MOKREJŠ wrote:
+> > > Hi,
+> > >   I get plenty of these in /sys/kernel/debug/kmemleak:
+> > > 
+> > > unreferenced object 0xffff88019f675268 (size 32):
+> > >   comm "usb-storage", pid 11411, jiffies 4310515592 (age 1538.100s)
+> > >   hex dump (first 32 bytes):
+> > >     05 0f 16 00 02 07 10 02 02 00 00 00 0a 10 03 00  ................
+> > >     0e 00 01 0a ff 07 00 00 00 00 00 00 00 00 00 00  ................
+> > >   backtrace:
+> > >     [<ffffffff81811ca1>] kmemleak_alloc+0x21/0x50
+> > >     [<ffffffff81166c5e>] __kmalloc+0xce/0x170
+> > >     [<ffffffff815270d5>] usb_get_bos_descriptor+0xc5/0x230
+> > >     [<ffffffff81519048>] hub_port_init+0x768/0xa20
+> > >     [<ffffffff81519416>] usb_reset_and_verify_device+0xd6/0x540
+> > >     [<ffffffff81519990>] usb_reset_device+0x110/0x190
+> > >     [<ffffffff8154aed4>] usb_stor_port_reset+0x74/0x80
+> > >     [<ffffffff8154af6f>] usb_stor_invoke_transport+0x8f/0x550
+> > >     [<ffffffff81549df9>] usb_stor_transparent_scsi_command+0x9/0x10
+> > >     [<ffffffff8154b7ab>] usb_stor_control_thread+0x16b/0x280
+> > >     [<ffffffff810b8c95>] kthread+0xe5/0xf0
+> > >     [<ffffffff8182caec>] ret_from_fork+0x7c/0xb0
+> > >     [<ffffffffffffffff>] 0xffffffffffffffff
+> > 
+> > Odd, Andiry and Sarah, any thoughts?  dmesg left below for completeness.
+> 
+> Martin is right; the BOS descriptors are leaked in 
+> usb_reset_and_verify_device().  We need to store the old descriptor,
+> compare it with the new one following the reset, and delete one of them 
+> afterward.  I haven't had time to fix this.
+
+I'll put it in my list of future tasks to give to Xenia. :)
+
+Sarah Sharp
