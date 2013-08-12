@@ -1,0 +1,33 @@
+todo
+----
+
+Sarah
+ - review DMA patch, see if it's what Andy wanted. [from 08/05]
+ - get trace events into usb-next [from 08/05]
+ - send link to netconsole tutorial:
+   http://sarah.thesharps.us/2010/03/26/update-for-netconsole-tutorial/
+
+Xenia
+ - send Sarah current xHCI bug patch and dmesg output
+ - email Steve Rostedt and trace-users about init trace issue
+ - send link to blog
+ - send flight info
+
+Notes
+-----
+
+Still having issues with xhci init trace event
+ - make sure to enable CONFIG_EARLY_PRINTK - under kernel hacking menu - Xenia says it is enabled.
+ - Xenia disabled dynamic trace, didn't help.
+ - Xenia will send email to Steven and trace-users mailing list
+
+Still having issues with xHCI configure endpoint bug fix patch.
+ - device does not appear because it resets it early?
+ - Xenia to send Sarah the patch and dmesg output
+
+Sarah - send netconsole tutorial
+
+Xenia - send link to your blog to Sarah
+ - blog post on how command ring and event ring works in the xHCI driver
+
+flight info - send to Sarah
