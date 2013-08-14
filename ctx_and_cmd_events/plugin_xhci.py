@@ -1,6 +1,33 @@
 import tracecmd
 from struct import unpack
 
+def get_slot_state(code):
+    states = {
+        0 : "Disabled",
+        1 : "Default",
+        2 : "Addressed",
+        3 : "Configured"
+        }
+
+    if code in states:
+        return states[code]
+    else:
+        return "Reserved"
+
+def get_ep_state(code):
+    states = {
+        0 : "Disabled",
+        1 : "Running",
+        2 : "Halted",
+        3 : "Stopped",
+        4 : "Error"
+        }
+
+    if code in states:
+        return states[code]
+    else:
+        return "Reserved"
+
 def parse_ctx_field(name, d):
     fields = {
         "dev_info": "[Route=0x%x][Speed=%d][MTT=%d][Hub=%d][CtxEntries=%d]" %
@@ -9,13 +36,15 @@ def parse_ctx_field(name, d):
         (d & 0xffff, (d>>16) & 0xff, (d>>24) & 0xff),
         "tt_info": "[TTHubSlot=%d][TTPort=%d][TTT=%d][IntrTarget=%d]" %
         (d & 0xff, (d>>8) & 0xff, (d>>16) & 0x3, d >> 22),
-        "dev_state": "[DevAddr=%x][SlotState=%d]" % (d & 0xff, d >> 27),
-        "ep_info": "[State=%d][Mult=%d][MaxPStreams=%d][LSA=%d][Interval=%d]" %
-        (d & 0x7, (d>>8) & 0x3, (d>>10) & 0x1f, (d>>15) & 0x1, (d>>16) & 0xff),
+        "dev_state": "[DevAddr=%x][SlotState=%s]" %
+        (d & 0xff, get_slot_state(d >> 27)),
+        "ep_info": "[EpState=%s][Mult=%d][MaxPStreams=%d][LSA=%d][Interval=%d]"%
+        (get_ep_state(d & 0x7), (d>>8) & 0x3, (d>>10) & 0x1f, (d>>15) & 0x1,
+         (d>>16) & 0xff),
         "ep_info2": "[CErr=%d][Type=%d][HID=%d][MaxBurstSz=%d][MaxPackSz=%d]" %
         ((d>>1) & 0x3, (d>>3) & 0x7, (d>>7) & 0x1, (d>>8) & 0xff, d >> 16),
         "deq": "[DCS=%d][TRDeqPtr=0x%x]" % (d & 0x1, (d>>4) << 4),
-        "tx_info": "[AvTRBLen=%d][MaxESITPayload=%d]" % (d & 0xffff, d >> 16)
+        "tx_info": "[AvgTRBLen=%d][MaxESITPayload=%d]" % (d & 0xffff, d >> 16)
         }
 
     if name in fields:
@@ -204,7 +233,7 @@ def xhci_cmd_handler(trace_seq, event):
     cmd_trb_va = long(event['va'])
     status = unpack("@4B", event['status'].data)
     flags = unpack("@4B", event['flags'].data)
-    cmd_trb = unpack("<Q2H4B", event['cmd_trb'].data)
+    cmd_trb = unpack("<Q2H4B", event['trb'].data)
 
     compl_status = get_compl_code_str(status[3]);
     event_type = flags[1] >> 2
@@ -212,18 +241,167 @@ def xhci_cmd_handler(trace_seq, event):
     slot_id = flags[3];
     cmd_data = get_cmd_data(cmd_trb)
 
-    trace_seq.puts("\n")
-    trace_seq.puts("%-10s\t%s\n" % ("Type:", cmd_data[0]))
-    trace_seq.puts("%-10s\t%s\n" % ("Status:", compl_status))
-    trace_seq.puts("%-10s\t@%x\n" % ("DMA addr:", cmd_trb_dma))
-    trace_seq.puts("%-10s\t@%x\n" % ("Virtual addr:", cmd_trb_va))
-    trace_seq.puts("%-10s\t%i\n" % ("VF ID:", vf_id))
-    trace_seq.puts("%-10s\t%i\n" % ("Slot ID:", slot_id))
-    trace_seq.puts("%-10s\t%s\n" % ("Cmd Fields:", cmd_data[1]))
+    if event_type == 33:
+        trace_seq.puts("Cmd Completion Event\n")
+    else:
+        return
+    trace_seq.puts("%-10s:\t%s\n" % ("Cmd Type", cmd_data[0]))
+    trace_seq.puts("%-10s:\t%s\n" % ("Status", compl_status))
+    trace_seq.puts("%-10s:\t@%x\n" % ("DMA addr", cmd_trb_dma))
+    trace_seq.puts("%-10s:\t@%x\n" % ("Virtual addr", cmd_trb_va))
+    trace_seq.puts("%-10s:\t%i\n" % ("VF ID", vf_id))
+    trace_seq.puts("%-10s:\t%i\n" % ("Slot ID", slot_id))
+    trace_seq.puts("%-10s:\t%s\n" % ("Cmd Fields", cmd_data[1]))
+
+def parse_normal_trb(tx_trb):
+    trb = unpack("<QI2H", tx_trb.data)
+    trb_str = '[DataBufferPtr=%x]' % trb[0]
+    trb_str += '[TRBTxLen=%d]' % (trb[1] & 0x1ffff)
+    trb_str += '[TDSize=%d]' % ((trb[1] >> 17) & 0x1f)
+    trb_str += '[IntrTarget=%d]' % (trb[1] >> 22)
+    trb_str += '[C=%d]' % (trb[2] & 1)
+    trb_str += '[ENT=%d]' % (1 if trb[2] & (1 << 1) else 0)
+    trb_str += '[ISP=%d]' % (1 if trb[2] & (1 << 2) else 0)
+    trb_str += '[NS=%d]' % (1 if trb[2] & (1 << 3) else 0)
+    trb_str += '[CH=%d]' % (1 if trb[2] & (1 << 4) else 0)
+    trb_str += '[IOC=%d]' % (1 if trb[2] & (1 << 5) else 0)
+    trb_str += '[IDT=%d]' % (1 if trb[2] & (1 << 6) else 0)
+    trb_str += '[BEI=%d]' % (1 if trb[2] & (1 << 9) else 0)
+    return trb_str
+
+def parse_setup_trb(tx_trb):
+    trb = unpack("<2B3HI2BH", tx_trb.data)
+    trb_str = '[bmRequestType=%02x]' % trb[0]
+    trb_str += '[bRequest=%02x]' % trb[1]
+    trb_str += '[wValue=%04x]' % trb[2]
+    trb_str += '[wIndex=%04x]' % trb[3]
+    trb_str += '[wLength=%d]' % trb[4]
+    trb_str += '[TRBTxLen=%d]' % (trb[5] & 0x1ffff)
+    trb_str += '[IntrTarget=%d]' % (trb[5] >> 22)
+    trb_str += '[C=%d]' % (trb[6] & 1)
+    trb_str += '[IOC=%d]' % (1 if trb[6] & (1 << 5) else 0)
+    trb_str += '[IDT=%d]' % (1 if trb[6] & (1 << 6) else 0)
+    trb_str += '[TRT=%d]' % trb[8]
+    return trb_str
+
+def parse_data_trb(tx_trb):
+    trb = unpack("<QI2H", tx_trb.data)
+    trb_str = '[DataBufferPtr=%x]' % trb[0]
+    trb_str += '[TRBTxLen=%d]' % (trb[1] & 0x1ffff)
+    trb_str += '[TDSize=%d]' % ((trb[1] >> 17) & 0x1f)
+    trb_str += '[IntrTarget=%d]' % (trb[1] >> 22)
+    trb_str += '[C=%d]' % (trb[2] & 1)
+    trb_str += '[ENT=%d]' % (1 if trb[2] & (1 << 1) else 0)
+    trb_str += '[ISP=%d]' % (1 if trb[2] & (1 << 2) else 0)
+    trb_str += '[NS=%d]' % (1 if trb[2] & (1 << 3) else 0)
+    trb_str += '[CH=%d]' % (1 if trb[2] & (1 << 4) else 0)
+    trb_str += '[IOC=%d]' % (1 if trb[2] & (1 << 5) else 0)
+    trb_str += '[IDT=%d]' % (1 if trb[2] & (1 << 6) else 0)
+    trb_str += '[BEI=%d]' % (1 if trb[2] & (1 << 9) else 0)
+    trb_str += '[DIR=%d]' % (trb[3] & 1)
+    return trb_str
+
+def parse_status_trb(tx_trb):
+    trb = unpack("<QI2H", tx_trb.data)
+    trb_str = '[IntrTarget=%d]' % (trb[1] >> 22)
+    trb_str += '[C=%d]' % (trb[2] & 1)
+    trb_str += '[ENT=%d]' % (1 if trb[2] & (1 << 1) else 0)
+    trb_str += '[CH=%d]' % (1 if trb[2] & (1 << 4) else 0)
+    trb_str += '[IOC=%d]' % (1 if trb[2] & (1 << 5) else 0)
+    trb_str += '[DIR=%d]' % (trb[3] & 1)
+    return trb_str
+
+def parse_isoch_trb(tx_trb):
+    trb = unpack("<QI2H", tx_trb.data)
+    trb_str = '[DataBufferPtr=%x]' % trb[0]
+    trb_str += '[TRBTxLen=%d]' % (trb[1] & 0x1ffff)
+    trb_str += '[TDSize=%d]' % ((trb[1] >> 17) & 0x1f)
+    trb_str += '[IntrTarget=%d]' % (trb[1] >> 22)
+    trb_str += '[C=%d]' % (trb[2] & 1)
+    trb_str += '[ENT=%d]' % (1 if trb[2] & (1 << 1) else 0)
+    trb_str += '[ISP=%d]' % (1 if trb[2] & (1 << 2) else 0)
+    trb_str += '[NS=%d]' % (1 if trb[2] & (1 << 3) else 0)
+    trb_str += '[CH=%d]' % (1 if trb[2] & (1 << 4) else 0)
+    trb_str += '[IOC=%d]' % (1 if trb[2] & (1 << 5) else 0)
+    trb_str += '[IDT=%d]' % (1 if trb[2] & (1 << 6) else 0)
+    trb_str += '[TBC=%d]' % ((trb[2] >> 7) & 0X3)
+    trb_str += '[BEI=%d]' % (1 if trb[2] & (1 << 9) else 0)
+    trb_str += '[TLBPC=%d]' % (trb[3] & 0xf)
+    trb_str += '[FrameID=%d]' % ((trb[3] << 1) >> 4)
+    trb_str += '[SIA=%d]' % (1 if trb[3] & (1 << 15) else 0)
+    return trb_str
+
+def parse_noop_trb(tx_trb):
+    trb = unpack("<QI2H", tx_trb.data)
+    trb_str = '[IntrTarget=%d]' % (trb[1] >> 22)
+    trb_str += '[C=%d]' % (trb[2] & 1)
+    trb_str += '[ENT=%d]' % (1 if trb[2] & (1 << 1) else 0)
+    trb_str += '[CH=%d]' % (1 if trb[2] & (1 << 4) else 0)
+    trb_str += '[IOC=%d]' % (1 if trb[2] & (1 << 5) else 0)
+    trb_str += '[DIR=%d]' % (trb[3] & 1)
+    return trb_str
+
+def parse_event_data_trb(tx_trb):
+    trb = unpack("<QI2H", tx_trb.data)
+    trb_str = '[EventDataPtr=%x]' % trb[0]
+    trb_str += '[IntrTarget=%d]' % (trb[1] >> 22)
+    trb_str += '[C=%d]' % (trb[2] & 1)
+    trb_str += '[ENT=%d]' % (1 if trb[2] & (1 << 1) else 0)
+    trb_str += '[CH=%d]' % (1 if trb[2] & (1 << 4) else 0)
+    trb_str += '[IOC=%d]' % (1 if trb[2] & (1 << 5) else 0)
+    trb_str += '[BEI=%d]' % (1 if trb[2] & (1 << 9) else 0)
+    return trb_str
+
+def get_tx_trb_data(tx_trb):
+    tx_trb_type = (unpack("<3I2BH", tx_trb.data))[4] >> 2
+    tx_trb_types = {
+        1 : ["Normal TRB", parse_normal_trb(tx_trb)],
+        2 : ["Setup Stage TRB", parse_setup_trb(tx_trb)],
+        3 : ["Data Stage TRB", parse_data_trb(tx_trb)],
+        4 : ["Status Stage TRB", parse_status_trb(tx_trb)],
+        5 : ["Isoch TRB", parse_isoch_trb(tx_trb)],
+        6 : ["Link TRB", ""],
+        7 : ["Event Data TRB", parse_event_data_trb(tx_trb)],
+        8 : ["No-Op TRB", parse_noop_trb(tx_trb)]}
+
+    if tx_trb_type in tx_trb_types:
+        return tx_trb_types[tx_trb_type]
+    else:
+        return ["Invalid Transfer Ring TRB Type", "Unknown"]
+
+
+def xhci_tx_completion_handler(trace_seq, event):
+
+    tx_trb_dma = long(event['dma'])
+    tx_trb_va = long(event['va'])
+    status = unpack("@H2B", event['status'].data)
+    flags = unpack("@4B", event['flags'].data)
+    trb_data = get_tx_trb_data(event['trb'])
+
+    compl_status = get_compl_code_str(status[2]);
+    tx_len = (status[1] << 16) | status[0]
+    ed = flags[0] & 0x4
+    event_type = flags[1] >> 2
+    ep_id = flags[2];
+    slot_id = flags[3];
+
+    if event_type == 32:
+        trace_seq.puts("Transfer Event\n")
+    else:
+        return
+    trace_seq.puts("%-10s:\t%s\n" % ("TRB Type", trb_data[0]))
+    trace_seq.puts("%-10s:\t%s\n" % ("Status", compl_status))
+    trace_seq.puts("%-10s:\t@%x\n" % ("DMA addr", tx_trb_dma))
+    trace_seq.puts("%-10s:\t@%x\n" % ("Virtual addr", tx_trb_va))
+    trace_seq.puts("%-10s:\t%i\n" % ("EDTLA" if ed else "Transfer len", tx_len))
+    trace_seq.puts("%-10s:\t%i\n" % ("EP ID", ep_id))
+    trace_seq.puts("%-10s:\t%i\n" % ("Slot ID", slot_id))
+    trace_seq.puts("%-10s:\t%s\n" % ("TRB Fields", trb_data[1]))
 
 
 def register(pevent):
     pevent.register_event_handler('xhci-hcd', 'xhci_address_ctx',
                                   xhci_ctx_handler)
-    pevent.register_event_handler('xhci-hcd', 'xhci_cmd', xhci_cmd_handler)
+    pevent.register_event_handler('xhci-hcd', 'xhci_cmd_completion',
+                                  xhci_cmd_handler)
 
