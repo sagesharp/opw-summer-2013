@@ -1,0 +1,23 @@
+ARs
+---
+
+Xenia:
+ - create a rough outline of the talk, put in git repo.
+
+Sarah:
+ - look into clear halt issue: infinite loop on next clear halt
+
+
+Notes:
+-------
+
+OPW five-minute talk outline suggestion:
+ - experiences with the program, what you learned about, what was good and what needs improvement
+ - technical topics:
+   - what is dynamic debugging? how it helps (i.e. don't need a separate CONFIG flag)
+   - what are trace events?  talk about adding them to xHCI
+ - advice to future OPW interns
+
+Xenia says the clear halt issue is not related to xHCI endpoint state (which
+are zeroed) or the xhci_virt_ep variables stopped_trb and stopped_td (which are
+NULL).
