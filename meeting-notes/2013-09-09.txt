@@ -1,0 +1,7 @@
+slides - finish
+
+more patches to review
+ - replaced xhci_readl with readl, xhci_writel with writel
+ - there's a header file that specifies which order 64-bit fields are read in
+   - can replace xhci_read_64 and xhci_write_64 with calls from that header file
+ - 31 patches!
